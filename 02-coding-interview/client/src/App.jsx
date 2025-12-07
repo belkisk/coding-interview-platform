@@ -27,7 +27,9 @@ function App() {
   const socketRef = useRef(null)
   const backendUrlRef = useRef(
     import.meta.env.VITE_BACKEND_URL ||
-    window.location.origin
+    (window.location.port && window.location.port !== '3000'
+      ? `${window.location.protocol}//${window.location.hostname}:3000`
+      : window.location.origin)
   )
 
   const querySessionId = useRef(new URLSearchParams(window.location.search).get('session'))
