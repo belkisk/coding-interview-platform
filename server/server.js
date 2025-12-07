@@ -3,6 +3,9 @@ import { createServer } from 'http'
 import { Server } from 'socket.io'
 import cors from 'cors'
 import { v4 as uuid } from 'uuid'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 const app = express()
 const httpServer = createServer(app)
@@ -15,6 +18,11 @@ const io = new Server(httpServer, {
 
 app.use(cors())
 app.use(express.json())
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const clientDistPath = path.resolve(__dirname, '../client/dist')
+const serverPublicPath = path.resolve(__dirname, './public')
 
 const sessions = new Map()
 const socketToSession = new Map()
@@ -104,6 +112,25 @@ function emitUserCount(sessionId) {
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
+
+// Silence Chrome DevTools .well-known probe to avoid noisy 404/CSP warnings
+app.get('/.well-known/appspecific/com.chrome.devtools.json', (_req, res) => {
+  res.json({ status: 'ok' })
+})
+
+// Serve built frontend if present (prefer client/dist, fallback to server/public)
+const staticRoot = fs.existsSync(clientDistPath)
+  ? clientDistPath
+  : fs.existsSync(serverPublicPath)
+  ? serverPublicPath
+  : null
+
+if (staticRoot) {
+  app.use(express.static(staticRoot))
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(staticRoot, 'index.html'))
+  })
+}
 
 // Explicitly disable server-side code execution; handled in-browser via WASM
 app.post('/execute', (_req, res) => {
